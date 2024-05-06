@@ -1,8 +1,8 @@
-package jadx.plugins.example;
+package jadx.plugins.eval;
 
 import jadx.api.plugins.options.impl.BasePluginOptionsBuilder;
 
-public class PluginOptions extends BasePluginOptionsBuilder {
+public class EvalMethodOptions extends BasePluginOptionsBuilder {
 
 	private boolean enable = true;
 

@@ -1,4 +1,4 @@
-package jadx.plugins.example;
+package jadx.plugins.eval;
 
 import jadx.api.JavaMethod;
 import jadx.api.plugins.pass.JadxPassInfo;
@@ -24,8 +24,8 @@ public class EvalMethodPass implements JadxDecompilePass {
 	@Override
 	public JadxPassInfo getInfo() {
 		return new OrderedJadxPassInfo(
-				"EvalMethodPas",
-				"Evaluate methods in various ways and update the decompiler output.",
+				"EvalMethodPass",
+				"Evaluate methods in various ways and update the decompiler output.")
 				.before("RegionMakerVisitor");
 	}
 

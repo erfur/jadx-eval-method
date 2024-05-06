@@ -1,10 +1,11 @@
-package jadx.plugins.example;
+package jadx.plugins.eval;
 
 import jadx.api.metadata.ICodeNodeRef;
 import jadx.api.plugins.JadxPlugin;
 import jadx.api.plugins.JadxPluginContext;
 import jadx.api.plugins.JadxPluginInfo;
 import jadx.core.dex.nodes.MethodNode;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -12,7 +13,7 @@ public class EvalMethod implements JadxPlugin {
 	public static final String PLUGIN_ID = "eval-method";
 	private static final Logger LOG = LoggerFactory.getLogger(EvalMethod.class);
 
-	private final PluginOptions options = new PluginOptions();
+	private final EvalMethodOptions options = new EvalMethodOptions();
 
 	private final EvalMethodPass pass = new EvalMethodPass();
 	private JadxPluginContext context;
