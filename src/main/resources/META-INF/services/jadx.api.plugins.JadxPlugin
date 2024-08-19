@@ -1,1 +1,1 @@
-jadx.plugins.example.TestPlugin
+jadx.plugins.decompiler.EvalMethod

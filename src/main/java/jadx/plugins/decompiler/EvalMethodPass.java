@@ -1,9 +1,11 @@
-package jadx.plugins.eval;
+package jadx.plugins.decompiler;
 
 import jadx.api.JavaMethod;
+import jadx.api.plugins.input.data.attributes.JadxAttrType;
 import jadx.api.plugins.pass.JadxPassInfo;
 import jadx.api.plugins.pass.impl.OrderedJadxPassInfo;
 import jadx.api.plugins.pass.types.JadxDecompilePass;
+import jadx.api.plugins.pass.types.JadxPassType;
 import jadx.core.dex.info.MethodInfo;
 import jadx.core.dex.instructions.ConstStringNode;
 import jadx.core.dex.instructions.InvokeNode;
@@ -20,6 +22,8 @@ public class EvalMethodPass implements JadxDecompilePass {
 	private static final Logger LOG = LoggerFactory.getLogger(JavaMethod.class);
 
 	private final ArrayList<String> targetMethods = new ArrayList<String>();
+	public FridaProxy fridaProxy;
+	public String packageName;
 
 	@Override
 	public JadxPassInfo getInfo() {
@@ -59,8 +63,25 @@ public class EvalMethodPass implements JadxDecompilePass {
 						InsnNode argInsn = arg.unwrap();
 						if (isInvokeTarget(argInsn, mth)) {
 							LOG.info("Replacing arg");
-							// TODO create an executor to request the value from the frida eval server
-							var replacedValue = new ConstStringNode("replaced");
+							var method = ((InvokeNode) argInsn).getCallMth();
+							var newValue = fridaProxy.evalMethod(
+									packageName,
+									method.getDeclClass().getRawName(),
+									method.getName(),
+									method.getShortId(),
+									new ArrayList<String>() {
+										{
+											for (InsnArg arg : argInsn.getArguments()) {
+												add(((ConstStringNode) arg.unwrap()).getString());
+											}
+										}
+									});
+							if (newValue == null) {
+								LOG.error("Failed to evaluate method");
+								return;
+							}
+
+							var replacedValue = new ConstStringNode(newValue);
 							insn.replaceArg(arg, InsnArg.wrapArg(replacedValue));
 						}
 					}

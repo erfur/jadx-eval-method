@@ -11,16 +11,16 @@ plugins {
 }
 
 dependencies {
-	// use compile only scope to exclude jadx-core and its dependencies from result jar
-    compileOnly("io.github.skylot:jadx-core:1.5.0-SNAPSHOT") {
-        isChanging = true
-    }
-
     implementation("ch.qos.logback:logback-classic:1.5.4")
 
-    // fileTree("libs") {
-    //     include("*.jar")
-    // }
+    fileTree("libs") {
+        include("*.jar")
+    }
+
+    // use compile only scope to exclude jadx-core and its dependencies from result jar
+    compileOnly("io.github.skylot:jadx-core:1.5.0") {
+        isChanging = true
+    }
 
 //    implementation(files("libs/jadx-script-runtime-dev.jar"))
 //    implementation("io.github.oshai:kotlin-logging-jvm:6.0.4")
@@ -30,9 +30,15 @@ dependencies {
     testImplementation("org.junit.jupiter:junit-jupiter-api:5.10.1")
     testRuntimeOnly("org.junit.jupiter:junit-jupiter-engine:5.10.1")
 
-	testImplementation("io.github.skylot:jadx-smali-input:1.5.0-SNAPSHOT") {
-        isChanging = true
-    }
+	// testImplementation("io.github.skylot:jadx-smali-input:1.5.0-SNAPSHOT") {
+    //     isChanging = true
+    // }
+
+    runtimeOnly("io.grpc:grpc-netty-shaded:1.64.0")
+    implementation("io.grpc:grpc-protobuf:1.64.0")
+    implementation("io.grpc:grpc-stub:1.64.0")
+    implementation("io.grpc:grpc-protobuf:1.15.1")
+    compileOnly("org.apache.tomcat:annotations-api:6.0.53") // necessary for Java 9+
 }
 
 repositories {

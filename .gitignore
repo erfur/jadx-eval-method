@@ -31,3 +31,5 @@ idea/
 *.cfg
 *.orig
 
+/libs/*
+/.vscode/*
