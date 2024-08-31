@@ -1,11 +1,14 @@
 package jadx.plugins.decompiler;
 
+import java.util.ArrayList;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import jadx.api.JavaMethod;
-import jadx.api.plugins.input.data.attributes.JadxAttrType;
 import jadx.api.plugins.pass.JadxPassInfo;
 import jadx.api.plugins.pass.impl.OrderedJadxPassInfo;
 import jadx.api.plugins.pass.types.JadxDecompilePass;
-import jadx.api.plugins.pass.types.JadxPassType;
 import jadx.core.dex.info.MethodInfo;
 import jadx.core.dex.instructions.ConstStringNode;
 import jadx.core.dex.instructions.InvokeNode;
@@ -14,15 +17,12 @@ import jadx.core.dex.nodes.ClassNode;
 import jadx.core.dex.nodes.InsnNode;
 import jadx.core.dex.nodes.MethodNode;
 import jadx.core.dex.nodes.RootNode;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-import java.util.ArrayList;
 
 public class EvalMethodPass implements JadxDecompilePass {
 	private static final Logger LOG = LoggerFactory.getLogger(JavaMethod.class);
 
 	private final ArrayList<String> targetMethods = new ArrayList<String>();
-	public FridaProxy fridaProxy;
+	public FridaProxy fridaProxy = null;
 	public String packageName;
 
 	@Override
@@ -62,32 +62,39 @@ public class EvalMethodPass implements JadxDecompilePass {
 					if (arg.isInsnWrap()) {
 						InsnNode argInsn = arg.unwrap();
 						if (isInvokeTarget(argInsn, mth)) {
-							LOG.info("Replacing arg");
-							var method = ((InvokeNode) argInsn).getCallMth();
-							var newValue = fridaProxy.evalMethod(
-									packageName,
-									method.getDeclClass().getRawName(),
-									method.getName(),
-									method.getShortId(),
-									new ArrayList<String>() {
-										{
-											for (InsnArg arg : argInsn.getArguments()) {
-												add(((ConstStringNode) arg.unwrap()).getString());
-											}
-										}
-									});
-							if (newValue == null) {
-								LOG.error("Failed to evaluate method");
-								return;
+							String newStr = evalTarget((InvokeNode) argInsn);
+							if (newStr != null) {
+								insn.replaceArg(arg, InsnArg.wrapArg(new ConstStringNode(newStr)));
 							}
-
-							var replacedValue = new ConstStringNode(newValue);
-							insn.replaceArg(arg, InsnArg.wrapArg(replacedValue));
 						}
 					}
 				});
 			});
 		});
+	}
+
+	private String evalTarget(InvokeNode argInsn) {
+		LOG.info("Evaluating method");
+		var method = argInsn.getCallMth();
+		var newValue = fridaProxy.evalMethod(
+				packageName,
+				method.getDeclClass().getRawName(),
+				method.getName(),
+				method.getShortId(),
+				new ArrayList<String>() {
+					{
+						for (InsnArg arg : argInsn.getArguments()) {
+							add(((ConstStringNode) arg.unwrap()).getString());
+						}
+					}
+				});
+
+		if (newValue == null) {
+			LOG.error("Failed to evaluate method");
+			return null;
+		}
+
+		return newValue;
 	}
 
 	private boolean isInvokeTarget(InsnNode insn, MethodNode mth) {

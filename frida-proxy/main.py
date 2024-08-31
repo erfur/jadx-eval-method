@@ -1,92 +1,188 @@
+import asyncio
 import sys
-from time import sleep
-import frida
-import adb
-import logging
-import os
 from concurrent.futures import ThreadPoolExecutor
+from time import sleep
 
-logging.basicConfig(
-    level=logging.DEBUG,
-    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
-    filename="frida.log",
-    filemode="a",
+import adb
+import click
+import frida
+import grpc
+from loguru import logger
+from proto.rpc_pb2 import (
+    EvalReply,
+    EvalRequest,
+    EvalStatus,
+    InstallReply,
+    InstallRequest,
+    InstallStatus,
+)
+from proto.rpc_pb2_grpc import (
+    FridaEvalProxyServicer,
+    add_FridaEvalProxyServicer_to_server,
 )
 
-logger = logging.getLogger(__name__)
+_cleanup_coroutines = []
 
 
-def eval_method(pkg_name, class_name, method_name, method_arg):
-    device = frida.get_usb_device()
+class FridaEvalProxyRpc(FridaEvalProxyServicer):
+    async def install(
+        self,
+        request: InstallRequest,
+        context: grpc.aio.ServicerContext,
+    ) -> InstallReply:
+        try:
+            devices = adb.get_devices()
 
-    if pkg_name not in [app.identifier for app in device.enumerate_applications()]:
-        logger.error(f"Package {pkg_name} not found")
-        print("failed")
-        sys.exit(1)
+            if not devices:
+                logger.error(f"Error installing application: No devices found")
+                return InstallReply(status=InstallStatus.INSTALL_ERR_NO_DEVICES)
 
-    pid = device.spawn([pkg_name])
-    session = device.attach(pid)
+            device_id = devices[0]  # use the first device
 
-    method_info = {
-        "class": class_name,
-        "name": method_name,
-        "arg": method_arg,
-    }
+            logger.info(f"Using device: {device_id}")
 
-    with open("_agent.js", encoding="utf8") as f:
-        script = session.create_script(f.read()) #, runtime="v8")
+            device = adb.get_device(device_id)
+            result = device.install(request.package_path, False)
 
-    def on_message(message, data):
-        payload = message["payload"]
-        if payload["cmd"] == "init":
-            logger.info("Init")
-            logger.info(f"Method: {method_info}")
-            ThreadPoolExecutor().submit(script.exports_sync.eval_method, method_info)
-        elif payload["cmd"] == "log":
-            logger.info(payload["message"])
-        elif payload["cmd"] == "methodResult":
-            logger.info(f"Method Result: {payload['result']}")
-            print(payload["result"])
-        else:
-            logger.info(payload)
+            # TODO check if the app is already installed
 
-    script.on("message", on_message)
-    script.load()
+            if "Success" in result:
+                logger.info(f"Installed {request.package_path} successfully.")
+                return InstallReply(status=InstallStatus.INSTALL_OK)
+        except Exception as e:
+            logger.exception(f"Error installing application: {e}")
+            return InstallReply(status=InstallStatus.INSTALL_ERROR, error=str(e))
 
-    logger.info("Resume")
-    device.resume(pid)
+    async def eval(
+        self,
+        request: EvalRequest,
+        context: grpc.aio.ServicerContext,
+    ) -> EvalReply:
+        device = frida.get_usb_device()
 
-    device.on("process-crashed", lambda pid: sys.exit(1))
+        if request.package_name not in [
+            app.identifier for app in device.enumerate_applications()
+        ]:
+            logger.error(f"Package {request.package_name} not found")
+            return EvalReply(status=EvalStatus.EVAL_ERR_PACKAGE_NOT_FOUND)
 
-    for _ in range(10):
-        sleep(1)
+        try:
+            pid = device.spawn([request.package_name])
+        except frida.NotSupportedError:
+            logger.error("Cannot spawn app, check if frida server is running.")
+            return EvalReply(status=EvalStatus.EVAL_ERR_SPAWN_FAILED)
+
+        logger.info(f"Spawned {request.package_name} with PID: {pid}")
+
+        session = device.attach(pid)
+
+        method_info = {
+            "class": request.class_name,
+            "name": request.method_name,
+            "arg": request.method_args[0],
+        }
+
+        # TODO fix path, cwd might be different
+        with open("_agent.js", encoding="utf8") as f:
+            script = session.create_script(f.read())  # , runtime="v8")
+
+        result_event = asyncio.Event()
+        method_result = EvalReply(status=EvalStatus.EVAL_ERROR)
+
+        def on_message(message, data):
+            if message["type"] == "send" and message["payload"]["type"] == "result":
+                logger.info(f"Method Result: {message["payload"]['result']}")
+                method_result.status = EvalStatus.EVAL_OK
+                method_result.result = message["payload"]["result"]
+            elif message["type"] == "send" and message["payload"]["type"] == "error":
+                logger.error(f"Error: {message["payload"]['description']}")
+                method_result.status = EvalStatus.EVAL_ERR_SCRIPT_ERROR
+                method_result.error = message["payload"]["description"]
+            elif message["type"] == "error":
+                logger.error(f"Frida error: {message['description']}")
+                logger.error(f"Frida error stack: {message['stack'].decode()}")
+                method_result.status = EvalStatus.EVAL_ERR_FRIDA_ERROR
+                method_result.error = message["description"]
+            else:
+                logger.error(f"Unknown message: {message}")
+
+            # on_message is called from a different thread
+            loop.call_soon_threadsafe(result_event.set)
+
+        script.on("message", lambda message, data: on_message(message, data) and result_event.set())
+        script.load()
+        script.set_log_handler(lambda level, text: logger.info(f"[{device.id}][{pid}][{level}] {text}"))
+        script.post(
+            {
+                "method_info": method_info,
+            }
+        )
+
+        def crash_handler(pid):
+            logger.error("Process crashed, pid: %d", pid)
+            method_result.status = EvalStatus.EVAL_ERR_PROCESS_CRASHED
+            result_event.set()
+
+        device.on("process-crashed", crash_handler)
+
+        def on_timeout(task: asyncio.Task):
+            if task.cancelled():
+                return
+            
+            logger.error("Timeout")
+            method_result.status = EvalStatus.EVAL_ERR_TIMEOUT
+            result_event.set()
+
+        # set a timeout
+        timeout_task = asyncio.create_task(asyncio.sleep(5))
+        timeout_task.add_done_callback(on_timeout)
+
+        logger.info("Resume")
+        device.resume(pid)
+
+        await result_event.wait()
+        timeout_task.cancel()
+        return method_result
 
 
-def install_apk(apk_path):
-    devices = adb.get_devices()
+async def serve(addr: str, listen_port: int) -> None:
+    server = grpc.aio.server()
+    add_FridaEvalProxyServicer_to_server(FridaEvalProxyRpc(), server)
+    server.add_insecure_port(f"{addr}:{listen_port}")
+    await server.start()
 
-    if not devices:
-        print("No devices connected")
-        sys.exit(1)
+    async def server_graceful_shutdown():
+        logger.info("Shutting down...")
+        # Shuts down the server with 5 seconds of grace period. During the
+        # grace period, the server won't accept new connections and allow
+        # existing RPCs to continue within the grace period.
+        await server.stop(1)
 
-    device = devices[0]
-
-    device = adb.get_device(device)
-    device.install(apk_path, True)
-
-    print("installed")
+    _cleanup_coroutines.append(server_graceful_shutdown())
+    await server.wait_for_termination()
 
 
-def main(args):
-    if args[0] == "install":
-        install_apk(args[1])
-    elif args[0] == "eval":
-        eval_method(*args[1:])
-    else:
-        sys.exit(1)
+@click.command()
+@click.option("--port", default=50051, help="Port to listen on")
+def main(port):
+    logger.remove()
+    logger.add(
+        sys.stderr,
+        level="DEBUG",
+        format="<green>{time:HH:mm:ss:SSS}</green> | <level>{message}</level>",
+    )
+    log = logger.bind(context="main")
+    log.info(f"Starting server on localhost:{port}")
 
-    sys.exit(0)
+    global loop
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
+    try:
+        loop.run_until_complete(serve("localhost", port))
+    finally:
+        loop.run_until_complete(*_cleanup_coroutines)
+        loop.close()
 
 
 if __name__ == "__main__":
-    main(sys.argv[1:])
+    main()

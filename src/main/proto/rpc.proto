@@ -1,0 +1,49 @@
+syntax = "proto3";
+
+option java_package = "jadx.plugins.decompiler";
+
+package frida_eval;
+
+service FridaEvalProxy {
+  rpc install(InstallRequest) returns (InstallReply) {};
+  rpc eval(EvalRequest) returns (EvalReply) {};
+}
+
+message InstallRequest { string package_path = 1; }
+
+enum InstallStatus {
+  INSTALL_OK = 0;
+  INSTALL_ERROR = 1;
+  INSTALL_ALREADY_INSTALLED = 2;
+  INSTALL_ERR_NO_DEVICES = 3;
+}
+
+message InstallReply {
+  InstallStatus status = 1;
+  optional string error = 2;
+}
+
+message EvalRequest {
+  string package_name = 1;
+  string class_name = 2;
+  string method_name = 3;
+  string method_signature = 4;
+  repeated string method_args = 5;
+}
+
+enum EvalStatus {
+  EVAL_OK = 0;
+  EVAL_ERROR = 1;
+  EVAL_ERR_PACKAGE_NOT_FOUND = 2;
+  EVAL_ERR_TIMEOUT = 3;
+  EVAL_ERR_PROCESS_CRASHED = 4;
+  EVAL_ERR_SCRIPT_ERROR = 5;
+  EVAL_ERR_FRIDA_ERROR = 6;
+  EVAL_ERR_SPAWN_FAILED = 7;
+}
+
+message EvalReply {
+  EvalStatus status = 1;
+  optional string result = 2;
+  optional string error = 3;
+}

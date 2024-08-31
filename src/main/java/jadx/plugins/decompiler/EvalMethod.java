@@ -1,37 +1,27 @@
 package jadx.plugins.decompiler;
 
-import jadx.api.ResourceFile;
-import jadx.api.metadata.ICodeNodeRef;
-import jadx.api.plugins.JadxPlugin;
-import jadx.api.plugins.JadxPluginContext;
-import jadx.api.plugins.JadxPluginInfo;
-import jadx.api.plugins.events.JadxEventType;
-import jadx.core.dex.nodes.MethodNode;
-import jadx.core.utils.android.AndroidManifestParser;
-import jadx.core.utils.android.AppAttribute;
-import jadx.core.utils.android.ApplicationParams;
-import jadx.core.utils.exceptions.JadxRuntimeException;
-import jadx.core.xmlgen.XmlSecurity;
-
 import java.io.File;
 import java.io.StringReader;
-import java.net.URI;
-import java.net.URISyntaxException;
-import java.util.EnumSet;
 import java.util.List;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
 import javax.xml.parsers.DocumentBuilder;
 
-import java.nio.file.Paths;
-
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.w3c.dom.Document;
 import org.xml.sax.InputSource;
 
-import com.google.rpc.context.AttributeContext.Resource;
+import jadx.api.ResourceFile;
+import jadx.api.metadata.ICodeNodeRef;
+import jadx.api.plugins.JadxPlugin;
+import jadx.api.plugins.JadxPluginContext;
+import jadx.api.plugins.JadxPluginInfo;
+import jadx.core.dex.nodes.MethodNode;
+import jadx.core.utils.android.AndroidManifestParser;
+import jadx.core.utils.exceptions.JadxRuntimeException;
+import jadx.core.xmlgen.XmlSecurity;
 
 public class EvalMethod implements JadxPlugin {
 	public static final String PLUGIN_ID = "jadx-eval-method";
@@ -64,12 +54,12 @@ public class EvalMethod implements JadxPlugin {
 			return;
 		}
 
-		if (options.getScriptPath().isEmpty()) {
-			LOG.error("no script path");
+		try {
+			pass.fridaProxy = new FridaProxy("127.0.0.1", 50051);
+		} catch (Exception e) {
+			LOG.error("failed to create FridaProxy", e);
 			return;
 		}
-
-		FridaProxy fridaProxy = new FridaProxy("%s/main.py".formatted(options.getScriptPath()));
 
 		List<File> inputs = context.getArgs().getInputFiles();
 		if (inputs.isEmpty()) {
@@ -80,8 +70,12 @@ public class EvalMethod implements JadxPlugin {
 		}
 
 		LOG.info("installing package");
-		fridaProxy.installPackage(inputs.get(0).getAbsolutePath());
-		pass.fridaProxy = fridaProxy;
+		try {
+			pass.fridaProxy.installPackage(inputs.get(0).getAbsolutePath());
+		} catch (Exception e) {
+			LOG.error("Failed to install package, plugin will be disabled.");
+			return;
+		}
 
 		LOG.info("adding plugin pass");
 		context.addPass(pass);
@@ -135,14 +129,22 @@ public class EvalMethod implements JadxPlugin {
 
 			LOG.info("package name: {}", packageName);
 			pass.packageName = packageName;
+
+			LOG.info("plugin is ready");
+			options.setEnable(true);
 		});
 	}
 
 	private boolean enabled(ICodeNodeRef node) {
-		return node instanceof MethodNode;
+		return options.isEnable() && node instanceof MethodNode;
 	}
 
 	private void run(ICodeNodeRef node) {
+		if (!enabled(node)) {
+			LOG.error("plugin is not enabled or caret is not pointing at a method!");
+			return;
+		}
+
 		if (node instanceof MethodNode) {
 			this.pass.addTarget(((MethodNode) node).getMethodInfo().getRawFullId());
 			this.context.getGuiContext().reloadActiveTab();

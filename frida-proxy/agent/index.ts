@@ -1,5 +1,4 @@
 import { JavaUseOnceLoaded } from "./dyn_use.js";
-import { log } from "./logger.js";
 import { StringDecoder } from "string_decoder";
 import { Buffer } from "buffer";
 
@@ -13,10 +12,13 @@ import { Buffer } from "buffer";
 // });
 
 Java.perform(() => {
-    send({
-        cmd: "init",
+    toast("Hello from jadx-eval-method agent")
+
+    recv((msg: any) => {
+        const method = msg.method_info as MethodInfo;
+        console.log("Received method info: ", method.class, method.name, method.arg);
+        evalMethod(method);
     })
-    toast("Hello from agent")
 })
 
 interface MethodInfo {
@@ -43,14 +45,14 @@ function evalMethod(method: MethodInfo) {
         const resultStr = result.toString();
         toast("Result: " + resultStr);
         send({
-            cmd: "methodResult",
+            type: "result",
             result: resultStr,
         })
     } catch (error: any) {
         toast("Error: " + error);
         send({
-            cmd: "methodError",
-            error: error.toString(),
+            type: "error",
+            description: error.toString(),
         })
     }
 }
@@ -65,8 +67,4 @@ function toast(msg: string) {
                 Java.use("java.lang.StringBuilder").$new(msg), 0
             ).show();
     });
-}
-
-rpc.exports = {
-    evalMethod,
 }

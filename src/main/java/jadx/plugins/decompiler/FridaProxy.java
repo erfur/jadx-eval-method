@@ -1,55 +1,76 @@
 package jadx.plugins.decompiler;
 
+import java.util.ArrayList;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import io.grpc.ManagedChannelBuilder;
 import jadx.api.JavaMethod;
-
-import java.io.File;
-import java.util.ArrayList;
+import jadx.plugins.decompiler.FridaEvalProxyGrpc.FridaEvalProxyBlockingStub;
+import jadx.plugins.decompiler.Rpc.EvalReply;
+import jadx.plugins.decompiler.Rpc.EvalRequest;
+import jadx.plugins.decompiler.Rpc.EvalStatus;
+import jadx.plugins.decompiler.Rpc.InstallReply;
+import jadx.plugins.decompiler.Rpc.InstallRequest;
+import jadx.plugins.decompiler.Rpc.InstallStatus;
 
 public class FridaProxy {
     private static final Logger LOG = LoggerFactory.getLogger(JavaMethod.class);
+    private final FridaEvalProxyBlockingStub stub;
 
-    String scriptPath;
-
-    public FridaProxy(String scriptPath) {
-        LOG.info("creating frida client with script: %s".formatted(scriptPath));
-        this.scriptPath = scriptPath;
+    public FridaProxy(String host, int port) {
+        this(ManagedChannelBuilder.forAddress(host, port).usePlaintext());
     }
 
-    public void installPackage(String packagePath) {
-        LOG.info("installing package: {}", packagePath);
-        String out = runFridaCommand(new ArrayList<String>() {
-            {
-                add("install");
-                add(packagePath);
-            }
-        });
-        LOG.info("install output: {}", out);
+    public FridaProxy(ManagedChannelBuilder<?> channelBuilder) {
+        LOG.info("Creating FridaProxy");
+        this.stub = FridaEvalProxyGrpc.newBlockingStub(channelBuilder.build());
+    }
+
+    public void installPackage(String packageName) {
+        InstallRequest request = InstallRequest.newBuilder().setPackagePath(packageName).build();
+        InstallReply reply = stub.install(request);
+
+        if (reply.getStatus().equals(InstallStatus.INSTALL_OK)) {
+            LOG.info("Successfully installed package: " + packageName);
+        } else if (reply.getStatus().equals(InstallStatus.INSTALL_ALREADY_INSTALLED)) {
+            LOG.info("Package already installed: " + packageName);
+        } else if (reply.getStatus().equals(InstallStatus.INSTALL_ERR_NO_DEVICES)) {
+            LOG.error("Failed to install: No devices found");
+            throw new RuntimeException("Failed to install: No devices found");
+        } else {
+            LOG.error("Failed to install package: " + packageName);
+            LOG.error("Error message: " + reply.getError());
+            throw new RuntimeException("Failed to install package: " + packageName);
+        }
     }
 
     public String evalMethod(String packageName, String className, String methodName, String methodSignature,
             ArrayList<String> methodArgs) {
-        LOG.info("evaluating method");
+        var builder = EvalRequest.newBuilder()
+                .setPackageName(packageName)
+                .setClassName(className)
+                .setMethodName(methodName)
+                .setMethodSignature(methodSignature);
 
-        String hex = hexlify(methodArgs.get(0));
+        LOG.info("Arg count: " + methodArgs.size());
 
-        // ArrayList<String> cmdArgs = new ArrayList<>();
-        // cmdArgs.add("eval");
-        // cmdArgs.add(packageName);
-        // cmdArgs.add(methodName);
-        // cmdArgs.addAll(args);
+        for (String arg : methodArgs) {
+            builder.addMethodArgs(hexlify(arg));
+        }
 
-        return runFridaCommand(new ArrayList<String>() {
-            {
-                add("eval");
-                add(packageName);
-                add(className);
-                add(methodName);
-                add(hex);
-            }
-        });
+        EvalRequest request = builder.build();
+        EvalReply reply = stub.eval(request);
+
+        if (reply.getStatus().equals(EvalStatus.EVAL_OK)) {
+            LOG.info("Successfully evaluated method: " + methodName);
+            return reply.getResult();
+        } else {
+            LOG.error("Failed to evaluate method: " + methodName);
+            LOG.error("Error message: " + reply.getError());
+            return null;
+        }
     }
 
     private String hexlify(String string) {
@@ -62,31 +83,5 @@ public class FridaProxy {
             LOG.error("error hexlifying string", e);
         }
         return sb.toString();
-    }
-
-    private String runFridaCommand(ArrayList<String> args) {
-        args.add(0, "python");
-        args.add(1, scriptPath);
-
-        return runCommand(args, new File(scriptPath).getParent());
-    }
-
-    private String runCommand(ArrayList<String> args, String cwd) {
-        String out = "";
-        String err = "";
-        LOG.info("running command: {}", args);
-        ProcessBuilder pb = new ProcessBuilder(args).directory(new File(cwd));
-        try {
-            Process p = pb.start();
-            p.waitFor();
-            out = new String(p.getInputStream().readAllBytes()).strip();
-            err = new String(p.getErrorStream().readAllBytes()).strip();
-            LOG.error("command output: '{}'", out);
-            LOG.error("stderr: '{}'", err);
-        } catch (Exception e) {
-            LOG.error("error running command", e);
-        }
-
-        return out;
     }
 }
