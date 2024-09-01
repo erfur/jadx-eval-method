@@ -63,6 +63,7 @@ public class EvalMethodPass implements JadxDecompilePass {
 							String newStr = evalTarget((InvokeNode) argInsn);
 							if (newStr != null) {
 								LOG.info("Replacing {} with '{}'", arg, newStr);
+								// TODO: cache replacements
 								insn.replaceArg(arg, InsnArg.wrapArg(new ConstStringNode(newStr)));
 							}
 						}

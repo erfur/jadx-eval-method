@@ -56,7 +56,9 @@ public class FridaProxy {
 
         LOG.info("Arg count: " + methodArgs.size());
 
+        // TODO: support primitive types (e.g. int, boolean, etc.)
         for (String arg : methodArgs) {
+            // TODO: improve serialization
             builder.addMethodArgs(hexlify(arg));
         }
 
