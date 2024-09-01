@@ -82,7 +82,7 @@ public class EvalMethod implements JadxPlugin {
 
 		context.getGuiContext().addPopupMenuAction(
 				"Add method to eval targets",
-				(ICodeNodeRef node) -> enabled(node),
+				(ICodeNodeRef node) -> options.isEnable() && node instanceof MethodNode,
 				"G",
 				(ICodeNodeRef node) -> run(node));
 
@@ -135,21 +135,8 @@ public class EvalMethod implements JadxPlugin {
 		});
 	}
 
-	private boolean enabled(ICodeNodeRef node) {
-		return options.isEnable() && node instanceof MethodNode;
-	}
-
 	private void run(ICodeNodeRef node) {
-		if (!enabled(node)) {
-			LOG.error("plugin is not enabled or caret is not pointing at a method!");
-			return;
-		}
-
-		if (node instanceof MethodNode) {
-			this.pass.addTarget(((MethodNode) node).getMethodInfo().getRawFullId());
-			this.context.getGuiContext().reloadActiveTab();
-		} else {
-			LOG.error("caret is not pointing at a method!");
-		}
+		this.pass.addTarget(((MethodNode) node).getMethodInfo().getRawFullId());
+		this.context.getGuiContext().reloadActiveTab();
 	}
 }
