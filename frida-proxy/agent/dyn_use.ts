@@ -1,5 +1,3 @@
-import { log } from "./logger.js"
-
 type CallBackSet = Set<UseClassOnceLoadedCallback>
 let callbackMap = new Map<string, CallBackSet>()
 
@@ -11,7 +9,7 @@ function hookLoadClass() {
     ).implementation = function (name: string, resolve: boolean) {
         try {
             var result = this.loadClass(name, resolve)
-            log.debug("loaded class: " + name)
+            console.log("loaded class: " + name)
             if (callbackMap.has(name)) {
                 // trigger callbacks for this class
                 let classLoader = this
@@ -25,7 +23,7 @@ function hookLoadClass() {
             }
             return result
         } catch (e) {
-            log.debug("exception loading class: " + name)
+            console.log("exception loading class: " + name)
             throw e
         } finally {
         }
@@ -34,7 +32,7 @@ function hookLoadClass() {
     clazzClassLoader.loadClass.overload("java.lang.String").implementation = function (name: string) {
         try {
             var result = this.loadClass(name)
-            log.debug("loaded class: " + name)
+            console.log("loaded class: " + name)
             if (callbackMap.has(name)) {
                 // trigger callbacks for this class
                 let classLoader = this
@@ -48,7 +46,7 @@ function hookLoadClass() {
             }
             return result
         } catch (e) {
-            log.debug("exception loading class: " + name)
+            console.log("exception loading class: " + name)
             throw e
         } finally {
         }
