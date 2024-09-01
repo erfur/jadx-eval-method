@@ -55,7 +55,7 @@ public class EvalMethod implements JadxPlugin {
 		}
 
 		try {
-			pass.fridaProxy = new FridaProxy("127.0.0.1", 50051);
+			pass.fridaProxy = new FridaProxy(options.getFridaProxyHost(), options.getFridaProxyPort());
 		} catch (Exception e) {
 			LOG.error("failed to create FridaProxy", e);
 			return;
