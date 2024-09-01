@@ -66,14 +66,14 @@ public class EvalMethod implements JadxPlugin {
 			LOG.error("no input files");
 			return;
 		} else if (inputs.size() > 1) {
-			LOG.error("more than one input file, choosing the first one");
+			LOG.warn("more than one input file, choosing the first one");
 		}
 
 		LOG.info("installing package");
 		try {
 			pass.fridaProxy.installPackage(inputs.get(0).getAbsolutePath());
 		} catch (Exception e) {
-			LOG.error("Failed to install package, plugin will be disabled.");
+			LOG.error("Failed to install the package, plugin will be disabled.");
 			return;
 		}
 

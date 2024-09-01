@@ -35,24 +35,22 @@ public class EvalMethodPass implements JadxDecompilePass {
 
 	@Override
 	public void init(RootNode root) {
-		LOG.debug("Init pass");
+		LOG.debug("EvalMethodPass init");
 	}
 
 	@Override
 	public boolean visit(ClassNode cls) {
-		// return true if you want to visit the methods
+		// return true to visit methods
 		return true;
 	}
 
 	@Override
 	public void visit(MethodNode mth) {
-		LOG.info("visiting method {}", mth.getMethodInfo().getRawFullId());
+		LOG.trace("visiting method {}", mth.getMethodInfo().getRawFullId());
 
 		if (targetMethods.isEmpty()) {
-			LOG.warn("target methods array is empty");
 			return;
 		} else if (mth.isNoCode()) {
-			LOG.warn("method has no code");
 			return;
 		}
 
@@ -64,6 +62,7 @@ public class EvalMethodPass implements JadxDecompilePass {
 						if (isInvokeTarget(argInsn, mth)) {
 							String newStr = evalTarget((InvokeNode) argInsn);
 							if (newStr != null) {
+								LOG.info("Replacing {} with '{}'", arg, newStr);
 								insn.replaceArg(arg, InsnArg.wrapArg(new ConstStringNode(newStr)));
 							}
 						}
@@ -103,7 +102,7 @@ public class EvalMethodPass implements JadxDecompilePass {
 			MethodInfo callMth = ((InvokeNode) insn).getCallMth();
 			LOG.trace("Processing call to {}", callMth.getRawFullId());
 			if (targetMethods.contains(callMth.getRawFullId())) {
-				LOG.info("Found call to {} in {}", callMth.getRawFullId(), mth.getMethodInfo().getRawFullId());
+				LOG.debug("Found call to {} in {}", callMth.getRawFullId(), mth.getMethodInfo().getRawFullId());
 				return true;
 			}
 		}
@@ -112,7 +111,7 @@ public class EvalMethodPass implements JadxDecompilePass {
 	}
 
 	public void addTarget(String methodRawId) {
-		LOG.error("Adding method to targets: {}", methodRawId);
+		LOG.info("Adding method to targets: {}", methodRawId);
 		targetMethods.add(methodRawId);
 	}
 }
