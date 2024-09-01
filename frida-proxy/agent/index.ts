@@ -4,9 +4,6 @@ import { Buffer } from "buffer";
 
 // Java.performNow(() => {
 //     JavaUseOnceLoaded("re.obfuscator.challenge01.AHGILuuQdMj", () => {
-//         send({
-//             cmd: "init",
-//         })
 //         toast("Hello from agent");
 //     });
 // });
@@ -28,7 +25,6 @@ interface MethodInfo {
 }
 
 function unhexlify(hex: string): string {
-    // unhexlify a utf string
     const bytes = [];
     for (let i = 0; i < hex.length; i += 2) {
         bytes.push(parseInt(hex.substr(i, 2), 16));
