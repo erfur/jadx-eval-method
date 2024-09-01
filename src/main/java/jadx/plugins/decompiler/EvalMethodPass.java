@@ -43,7 +43,7 @@ public class EvalMethodPass implements JadxDecompilePass {
 
 	@Override
 	public void init(RootNode root) {
-		LOG.debug("EvalMethodPass init");
+		LOG.info("EvalMethodPass init");
 	}
 
 	@Override
@@ -72,7 +72,9 @@ public class EvalMethodPass implements JadxDecompilePass {
 
 		mth.getBasicBlocks().forEach(block -> {
 			block.getInstructions().forEach((InsnNode insn) -> {
+				LOG.trace("Processing instruction: {}", insn);
 				insn.getArguments().forEach((InsnArg arg) -> {
+					LOG.trace("Processing argument: {}", arg);
 					if (arg.isInsnWrap()) {
 						InsnNode argInsn = arg.unwrap();
 						if (isInvokeTarget(argInsn, mth)) {
@@ -83,8 +85,22 @@ public class EvalMethodPass implements JadxDecompilePass {
 								insn.replaceArg(arg, InsnArg.wrapArg(new ConstStringNode(newStr)));
 							}
 						}
+					} else {
+						LOG.trace("Argument is not an instruction: {}", arg);
 					}
 				});
+
+				if (insn instanceof InvokeNode) {
+					InvokeNode invokeInsn = (InvokeNode) insn;
+					if (isInvokeTarget(invokeInsn, mth)) {
+						String newStr = evalTarget(invokeInsn);
+						if (newStr != null) {
+							LOG.info("Replacing {} with '{}'", invokeInsn, newStr);
+							block.getInstructions().set(block.getInstructions().indexOf(invokeInsn),
+									new ConstStringNode(newStr));
+						}
+					}
+				}
 			});
 		});
 	}
@@ -122,6 +138,8 @@ public class EvalMethodPass implements JadxDecompilePass {
 				LOG.debug("Found call to {} in {}", callMth.getRawFullId(), mth.getMethodInfo().getRawFullId());
 				return true;
 			}
+		} else {
+			LOG.trace("Not an invoke insn: {}", insn);
 		}
 
 		return false;
