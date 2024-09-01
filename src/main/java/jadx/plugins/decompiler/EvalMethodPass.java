@@ -1,6 +1,9 @@
 package jadx.plugins.decompiler;
 
 import java.util.ArrayList;
+import java.util.concurrent.Executor;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -22,8 +25,13 @@ public class EvalMethodPass implements JadxDecompilePass {
 	private static final Logger LOG = LoggerFactory.getLogger(JavaMethod.class);
 
 	private final ArrayList<String> targetMethods = new ArrayList<String>();
-	public FridaProxy fridaProxy = null;
-	public String packageName;
+	private final FridaProxy fridaProxy;
+	private final PackageUtils packageUtils;
+
+	EvalMethodPass(FridaProxy fridaProxy, PackageUtils packageUtils) {
+		this.fridaProxy = fridaProxy;
+		this.packageUtils = packageUtils;
+	}
 
 	@Override
 	public JadxPassInfo getInfo() {
@@ -40,6 +48,14 @@ public class EvalMethodPass implements JadxDecompilePass {
 
 	@Override
 	public boolean visit(ClassNode cls) {
+		if (!packageUtils.isAppInstalled()) {
+			LOG.error("App not installed, cannot evaluate methods");
+			return false;
+		} else if (packageUtils.getPackageName() == null) {
+			LOG.error("Failed to get package name, cannot evaluate methods");
+			return false;
+		}
+
 		// return true to visit methods
 		return true;
 	}
@@ -77,7 +93,7 @@ public class EvalMethodPass implements JadxDecompilePass {
 		LOG.info("Evaluating method");
 		var method = argInsn.getCallMth();
 		var newValue = fridaProxy.evalMethod(
-				packageName,
+				packageUtils.getPackageName(),
 				method.getDeclClass().getRawName(),
 				method.getName(),
 				method.getShortId(),
