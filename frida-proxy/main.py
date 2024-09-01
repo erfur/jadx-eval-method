@@ -100,7 +100,7 @@ class FridaEvalProxyRpc(FridaEvalProxyServicer):
                 method_result.error = message["payload"]["description"]
             elif message["type"] == "error":
                 logger.error(f"Frida error: {message['description']}")
-                logger.error(f"Frida error stack: {message['stack'].decode()}")
+                logger.error(f"Frida error stack: {message['stack']}")
                 method_result.status = EvalStatus.EVAL_ERR_FRIDA_ERROR
                 method_result.error = message["description"]
             else:
