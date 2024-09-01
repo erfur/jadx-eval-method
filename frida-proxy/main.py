@@ -119,7 +119,7 @@ class FridaEvalProxyRpc(FridaEvalProxyServicer):
         )
 
         def crash_handler(pid):
-            logger.error("Process crashed, pid: %d", pid)
+            logger.error(f"Process crashed, pid: {pid}")
             method_result.status = EvalStatus.EVAL_ERR_PROCESS_CRASHED
             result_event.set()
 
