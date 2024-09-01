@@ -1,12 +1,4 @@
 
- ## JADX Example plugin
+ ## jadx-eval-method
 
-Simple example of jadx plugin.
-Adds a jadx watermark comment to every generated java class
-
-Install using location id: `github:jadx-decompiler:jadx-example-plugin`
-
-In jadx-cli:
-```bash
-  jadx plugins --install "github:jadx-decompiler:jadx-example-plugin"
-```
+ A PoC decompiler plugin for jadx-gui. Evaluate methods in runtime using frida and update the decompiler output with the result.
