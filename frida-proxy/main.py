@@ -153,9 +153,6 @@ async def serve(addr: str, listen_port: int) -> None:
 
     async def server_graceful_shutdown():
         logger.info("Shutting down...")
-        # Shuts down the server with 5 seconds of grace period. During the
-        # grace period, the server won't accept new connections and allow
-        # existing RPCs to continue within the grace period.
         await server.stop(1)
 
     _cleanup_coroutines.append(server_graceful_shutdown())
