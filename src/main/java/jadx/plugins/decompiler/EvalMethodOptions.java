@@ -23,6 +23,8 @@ public class EvalMethodOptions extends BasePluginOptionsBuilder {
 		option(EvalMethod.PLUGIN_ID + ".fridaProxyPort", int.class)
 				.description("Frida proxy port")
 				.defaultValue(50051)
+				.parser(Integer::parseInt)
+				.formatter(String::valueOf)
 				.setter(v -> fridaProxyPort = v);
 	}
 
