@@ -1,4 +1,5 @@
 import asyncio
+from pathlib import Path
 import sys
 from concurrent.futures import ThreadPoolExecutor
 from time import sleep
@@ -8,7 +9,7 @@ import click
 import frida
 import grpc
 from loguru import logger
-from proto.rpc_pb2 import (
+from rpc_pb2 import (
     EvalReply,
     EvalRequest,
     EvalStatus,
@@ -16,7 +17,7 @@ from proto.rpc_pb2 import (
     InstallRequest,
     InstallStatus,
 )
-from proto.rpc_pb2_grpc import (
+from rpc_pb2_grpc import (
     FridaEvalProxyServicer,
     add_FridaEvalProxyServicer_to_server,
 )
@@ -47,7 +48,7 @@ class FridaEvalProxyRpc(FridaEvalProxyServicer):
             # TODO check if the app is already installed
 
             if "Success" in result:
-                logger.info(f"Installed {request.package_path} successfully.")
+                logger.info(f"Installed {Path(request.package_path).name} successfully.")
                 return InstallReply(status=InstallStatus.INSTALL_OK)
         except Exception as e:
             logger.exception(f"Error installing application: {e}")
