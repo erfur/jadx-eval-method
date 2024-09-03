@@ -4,3 +4,4 @@ click==8.1.7
 frida==16.4.8
 grpcio==1.65.5
 loguru==0.7.2
+grpcio-tools==1.65.5
