@@ -3,7 +3,7 @@
 
 A PoC decompiler plugin for jadx-gui. Evaluates methods in runtime using frida and updates the decompiler output with the result. Main idea was to develop something specific to help solving [the open obfuscator challenge](https://obfuscator.re/challenges/2022-12-android-challenge/).
 
-Works only on methods with a single string argument.
+Works only on static methods with a single string argument. Tested on jadx-gui v1.5.0.
 
 Before:
 
